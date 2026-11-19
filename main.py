@@ -12,6 +12,9 @@ from sympy.parsing.sympy_parser import (
 )
 
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 URL = "https://mathebattle.de/edu_battles"
 
@@ -23,7 +26,6 @@ TRANSFORMATIONS = standard_transformations + (
 )
 
 letzte_aufgabe = ""
-
 
 # ==========================================
 # CHROME STARTEN
@@ -124,7 +126,7 @@ def ausdruck_erstellen(formel):
     formel = formel.replace("π", "pi")
 
     if not re.fullmatch(
-        r"[0-9x+\-*/().^ ]+",
+        r"[0-9x+*/().^ \-sqrtpi]+",
         formel
     ):
         raise ValueError(
@@ -133,9 +135,39 @@ def ausdruck_erstellen(formel):
 
     return parse_expr(
         formel,
-        local_dict={"x": x},
+        local_dict={
+            "x": x,
+            "sqrt": sp.sqrt,
+            "pi": sp.pi
+        },
         transformations=TRANSFORMATIONS
     )
+
+
+# ==========================================
+# LÖSUNG IN DAS INPUTFELD EINTRAGEN
+# ==========================================
+
+def loesung_eintragen(loesung):
+
+    try:
+
+        feld = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, 'input[name="sol"].w120')
+            )
+        )
+
+        feld.clear()
+        feld.send_keys(loesung)
+
+        print("\n[+] Lösung wurde eingetragen:")
+        print(loesung)
+
+    except Exception as error:
+
+        print("\n[-] Eingabefeld nicht gefunden:")
+        print(error)
 
 
 # ==========================================
@@ -161,7 +193,6 @@ def gleichung_loesen(formeln):
 
         gleichung = sp.Eq(links, rechts)
 
-        # Nur reelle Lösungen
         loesungen = sp.solveset(
             gleichung,
             x,
@@ -171,14 +202,19 @@ def gleichung_loesen(formeln):
         print("\n========== ERGEBNIS ==========")
 
         if loesungen == sp.EmptySet:
+
             print("L = {}")
+            loesung_eintragen("{}")
             return
 
         if loesungen == sp.S.Reals:
+
             print("Unendlich viele Lösungen: L = R")
+            loesung_eintragen("R")
             return
 
         if not isinstance(loesungen, sp.FiniteSet):
+
             print("Lösungsmenge konnte nicht vollständig bestimmt werden:")
             print(loesungen)
             return
@@ -188,19 +224,20 @@ def gleichung_loesen(formeln):
             key=lambda value: float(sp.N(value))
         )
 
-        print(
-            "L = {" +
-            "; ".join(
-                str(sp.simplify(l))
-                for l in loesungen
-            ) +
-            "}"
+        ergebnis = "; ".join(
+            str(sp.simplify(l))
+            for l in loesungen
         )
+
+        print("L = {" + ergebnis + "}")
 
         print("\nDezimalwerte:")
 
         for loesung in loesungen:
             print("x =", sp.N(loesung, 8))
+
+        # AUTOMATISCH INS INPUTFELD EINTRAGEN
+        loesung_eintragen(ergebnis)
 
     except Exception as error:
 
