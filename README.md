@@ -1,1 +1,2 @@
-# mathe-battle-craker
+# Mathebattle Payload
+**Mathebattle Payload** is a tool for the internetsite [Mathebattle](https://mathebattle.de/). The Tool reads the Task, solves it, and injects the correct solution directly in the input fiel.
