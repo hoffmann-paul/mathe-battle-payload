@@ -13,8 +13,6 @@ from sympy.parsing.sympy_parser import (
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 URL = "https://mathebattle.de/edu_battles"
 
@@ -26,6 +24,7 @@ TRANSFORMATIONS = standard_transformations + (
 )
 
 letzte_aufgabe = ""
+
 
 # ==========================================
 # CHROME STARTEN
@@ -126,7 +125,7 @@ def ausdruck_erstellen(formel):
     formel = formel.replace("π", "pi")
 
     if not re.fullmatch(
-        r"[0-9x+*/().^ \-sqrtpi]+",
+        r"[0-9x+\-*/().^ pi]+",
         formel
     ):
         raise ValueError(
@@ -137,7 +136,6 @@ def ausdruck_erstellen(formel):
         formel,
         local_dict={
             "x": x,
-            "sqrt": sp.sqrt,
             "pi": sp.pi
         },
         transformations=TRANSFORMATIONS
@@ -145,29 +143,29 @@ def ausdruck_erstellen(formel):
 
 
 # ==========================================
-# LÖSUNG IN DAS INPUTFELD EINTRAGEN
+# LÖSUNG EINTRAGEN
 # ==========================================
 
 def loesung_eintragen(loesung):
 
     try:
 
-        feld = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, 'input[name="sol"].w120')
-            )
+        feld = driver.find_element(
+            By.CSS_SELECTOR,
+            'input[name="sol"].w120'
         )
 
         feld.clear()
+
+        loesung = str(loesung).lstrip()
+
         feld.send_keys(loesung)
 
-        print("\n[+] Lösung wurde eingetragen:")
-        print(loesung)
+        print("[+] Lösung eingetragen:", repr(loesung))
 
     except Exception as error:
 
-        print("\n[-] Eingabefeld nicht gefunden:")
-        print(error)
+        print("[-] Fehler beim Eintragen:", error)
 
 
 # ==========================================
@@ -176,12 +174,23 @@ def loesung_eintragen(loesung):
 
 def gleichung_loesen(formeln):
 
-    if len(formeln) < 2:
-        print("Nicht genügend Formeln gefunden.")
-        return
+    if len(formeln) == 1:
 
-    links_text = formeln[0]
-    rechts_text = formeln[1]
+        links_text = formeln[0]
+        rechts_text = "0"
+
+        print("[INFO] Nur eine Formel erkannt.")
+        print("[INFO] Rechte Seite wird als 0 angenommen.")
+
+    elif len(formeln) >= 2:
+
+        links_text = formeln[0]
+        rechts_text = formeln[1]
+
+    else:
+
+        print("Keine Formeln gefunden.")
+        return
 
     print("\nErkannte Gleichung:")
     print(links_text, "=", rechts_text)
@@ -236,7 +245,6 @@ def gleichung_loesen(formeln):
         for loesung in loesungen:
             print("x =", sp.N(loesung, 8))
 
-        # AUTOMATISCH INS INPUTFELD EINTRAGEN
         loesung_eintragen(ergebnis)
 
     except Exception as error:
@@ -261,6 +269,22 @@ def aufgabe_auslesen():
     formeln = formeln_auslesen()
 
     return text, formeln
+
+
+# ==========================================
+# AUFGABENERKENNUNG
+# ==========================================
+
+def ist_aufgabe(text, formeln):
+
+    text = " ".join(text.split()).lower()
+
+    aufgaben_text = (
+        "löse die folgende gleichung" in text
+        or "löse folgende gleichung" in text
+    )
+
+    return aufgaben_text and len(formeln) in (1, 2)
 
 
 # ==========================================
@@ -289,10 +313,7 @@ try:
 
             text, formeln = aufgabe_auslesen()
 
-            if (
-                "Löse die folgende Gleichung" in text
-                and len(formeln) >= 2
-            ):
+            if ist_aufgabe(text, formeln):
 
                 schluessel = (
                     driver.current_url +
@@ -306,6 +327,8 @@ try:
                     print("\n\n====================================")
                     print("             NEUE AUFGABE")
                     print("====================================")
+
+                    print("Formeln:", formeln)
 
                     gleichung_loesen(formeln)
 
